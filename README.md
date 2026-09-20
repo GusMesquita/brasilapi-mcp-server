@@ -4,7 +4,7 @@ Servidor [MCP](https://modelcontextprotocol.io) que expõe a [BrasilAPI](https:/
 
 Serve dois papéis:
 1. **Standalone**: conectado ao Claude Desktop/Claude Code via stdio, permite que o modelo consulte dados públicos brasileiros durante uma conversa.
-2. **Serviço de enriquecimento**: usado por outros projetos deste portfólio ([lead-router](../lead-router)) para enriquecer leads com dados de CNPJ/CEP.
+2. **Serviço de enriquecimento**: usado por outros projetos deste portfólio (`lead-router`) para enriquecer leads com dados de CNPJ/CEP.
 
 ## Ferramentas expostas
 
