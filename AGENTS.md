@@ -22,6 +22,10 @@ assume when it calls these tools.
 
 - No write/mutation tools exist or will be added silently — this server's
   scope is deliberately limited to lookups.
-- CNPJ/CEP validity is not checked before the call is made; a malformed
-  input reaches BrasilAPI and comes back as a `NotFoundError` or generic 4xx,
-  not a local validation error.
+- Dígito verificador de CNPJ e existência do CEP **não** são checados
+  localmente: isso continua vindo da BrasilAPI como `NotFoundError`. O que é
+  validado antes da chamada é só a forma — 14 dígitos para CNPJ, 8 para CEP,
+  ano entre 1900 e 2199 — e a falha vem como `InvalidInputError`, que é um
+  `ValueError`, não um `BrasilAPIError`. A distinção importa para o agente:
+  `InvalidInputError` significa "corrija a entrada", `NotFoundError` significa
+  "a entrada está bem formada, o registro é que não existe".

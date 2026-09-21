@@ -18,10 +18,11 @@ então o alvo do lint é a versão **mínima suportada**, não a da máquina de 
 
 ## Lint e formatação
 
-```
+```text
 ruff check .
 ruff format .
 ```
+
 `select = ["E", "F", "I", "UP", "B"]`, `line-length = 100`.
 
 ## Erros de API externa

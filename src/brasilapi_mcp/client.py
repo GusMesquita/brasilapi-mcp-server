@@ -22,6 +22,10 @@ class BrasilAPIError(Exception):
         super().__init__(f"BrasilAPI error {status_code}: {message}")
 
 
+class InvalidInputError(ValueError):
+    """Entrada malformada — barrada aqui, sem gastar uma chamada na BrasilAPI."""
+
+
 class NotFoundError(BrasilAPIError):
     """404 — the requested CNPJ/CEP/resource doesn't exist."""
 
@@ -74,19 +78,40 @@ async def _get(path: str, *, cacheable: bool = True) -> dict:
     raise last_error
 
 
+def _only_digits(value: str, *, expected: int, label: str) -> str:
+    """Normaliza e valida antes de montar a URL.
+
+    Sem o check de tamanho, uma string vazia vira `/cnpj/v1/` (outro endpoint) e
+    qualquer lixo vira uma chamada garantidamente perdida na BrasilAPI — com o
+    404 de lá chegando ao cliente MCP como se o documento não existisse, em vez
+    de como o erro de entrada que é.
+    """
+    digits = "".join(filter(str.isdigit, value))
+    if len(digits) != expected:
+        raise InvalidInputError(
+            f"{label} deve ter {expected} dígitos; recebido {len(digits)} em {value!r}"
+        )
+    return digits
+
+
 async def get_cnpj(cnpj: str) -> dict:
-    digits = "".join(filter(str.isdigit, cnpj))
-    return await _get(f"/cnpj/v1/{digits}")
+    return await _get(f"/cnpj/v1/{_only_digits(cnpj, expected=14, label='CNPJ')}")
 
 
 async def get_cep(cep: str) -> dict:
-    digits = "".join(filter(str.isdigit, cep))
-    return await _get(f"/cep/v2/{digits}")
+    return await _get(f"/cep/v2/{_only_digits(cep, expected=8, label='CEP')}")
 
 
 async def list_banks() -> list[dict]:
     return await _get("/banks/v1")
 
 
+# Faixa suportada pela BrasilAPI: fora dela a resposta é 404, indistinguível
+# de "não há feriados" para quem consome a tool.
+_MIN_YEAR, _MAX_YEAR = 1900, 2199
+
+
 async def get_holidays(year: int) -> list[dict]:
+    if not _MIN_YEAR <= year <= _MAX_YEAR:
+        raise InvalidInputError(f"ano deve estar entre {_MIN_YEAR} e {_MAX_YEAR}; recebido {year}")
     return await _get(f"/feriados/v1/{year}")
