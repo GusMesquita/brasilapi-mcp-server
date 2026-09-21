@@ -7,22 +7,36 @@ behavioral contract each tool follows.
 """
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
 
 from brasilapi_mcp import client
 from brasilapi_mcp.logging_config import configure_logging
 
 configure_logging()
 
-mcp = FastMCP("brasilapi", stateless_http=True)
 
-_READ_ONLY = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": True,
-}
+@asynccontextmanager
+async def lifespan(server: MCPServer) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        # Fecha o cliente HTTP compartilhado; sem isso o httpx reclama de
+        # conexões abertas no encerramento.
+        await client.aclose()
+
+
+mcp = MCPServer("brasilapi", lifespan=lifespan)
+
+_READ_ONLY = ToolAnnotations(
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=True,
+)
 
 
 @mcp.tool(annotations=_READ_ONLY)
@@ -65,8 +79,13 @@ async def get_holidays(year: int) -> list[dict]:
 def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport == "streamable-http":
-        mcp.settings.host = os.environ.get("MCP_HTTP_HOST", "0.0.0.0")
-        mcp.settings.port = int(os.environ.get("MCP_HTTP_PORT", "8001"))
+        mcp.run(
+            transport=transport,
+            host=os.environ.get("MCP_HTTP_HOST", "0.0.0.0"),
+            port=int(os.environ.get("MCP_HTTP_PORT", "8001")),
+            stateless_http=True,
+        )
+        return
     mcp.run(transport=transport)
 
 
