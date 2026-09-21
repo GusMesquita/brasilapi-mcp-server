@@ -13,7 +13,11 @@ assume when it calls these tools.
   `RateLimitedError` (back off) vs. generic `BrasilAPIError` are distinct
   exceptions — a calling agent (or the FastAPI wrapper in `lead-router`) can
   branch on `isinstance()` instead of parsing message strings.
-- **A 404 is not retried; a 429 or 5xx is, twice, with exponential backoff**
+- **Falha de rede (timeout, DNS, conexão recusada) vira
+  `UpstreamUnavailableError`**, com status sintético 503 — nunca uma exceção
+  crua do httpx. É um `BrasilAPIError`, e deliberadamente **não** é um
+  `NotFoundError`: "o serviço não respondeu" não é "o registro não existe".
+- **A 404 is not retried; a 429, 5xx ou falha de rede é, twice, with exponential backoff**
   (`client.py::_get`). An agent never sees a transient blip as a hard failure.
 - **Successful lookups are cached for 1 hour** (`cache.py`). Calling
   `lookup_cnpj` twice for the same CNPJ in a session costs one real HTTP call.
