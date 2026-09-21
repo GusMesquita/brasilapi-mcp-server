@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: nenhum job aqui escreve no repositório.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: lint + test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # pyproject declara requires-python = ">=3.11"; a matriz prova a afirmação
+      # em vez de confiar nela.
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      # --locked falha se uv.lock estiver dessincronizado do pyproject.
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q
+
+  security:
+    name: segredos + dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # gitleaks varre o histórico inteiro, não só o diff
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v10
+      - name: Exportar dependências de runtime
+        run: uv export --format requirements-txt --no-emit-project --no-dev -o requirements-audit.txt
+      - name: Auditar CVEs
+        run: uvx pip-audit -r requirements-audit.txt
+
+  docker:
+    name: build da imagem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Prova que o Dockerfile constrói; não publica nada.
+      - run: docker build -t brasilapi-mcp-server:ci .
